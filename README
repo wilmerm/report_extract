@@ -1,0 +1,15 @@
+APLICACIÓN PARA LA EXTRACCIÓN DE DATOS DE REPORTES EN FORMATO EXCEL GENERADOS
+POR OTRA APLICACIÓN, CUYA DISPOSICIÓN DE LOS DATOS NO ES LA IDEAL.
+
+Desarrollada en principio para Refricentro Rubiera.
+
+
+Dependencias:
+    python-xlrd
+    python-xlwt
+
+
+Extrae la informaición del reporte indicado en formato Excel.
+Permite exportarlo a otro archivo de forma Excel, con la nueva disposición de 
+los datos.
+
