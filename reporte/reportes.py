@@ -94,17 +94,15 @@ class SicflexReporteVentasPorFechaDetallada(Reporte):
     "descuento", "itbis", "neto")
 
     def __init__(self, filename):
-        self.Open(filename)
-        self.read()
+        super().__init__(filename)
 
-    @classmethod
-    def clean(self, data):
+    def clean(self):
         """
         Limpia los datos del reporte Sicflex 'Ventas/Ventas por Fecha/Factura 
         (Detallada)', según la disposición de sus valores y retorna un listado 
         de dicionarios con los nuevos valores ordenados.
         """
-        data = Excel.cleanrows(data)
+        data = self.rawdata
         out = []
         datalength = len(data)
         index = self.ROW_FACTURA_DETALLE
@@ -147,8 +145,37 @@ class SicflexReporteVentasPorFechaDetallada(Reporte):
                 # En este punto no hemos encontrado nada que coincida con lo que
                 # andamos buscando, por lo tanto probamos una nueva iteración.
                 continue
-        
+        self.data = out
         return out
+
+    
+    def SetVendedores(self, filename):
+        """
+        Los datos extras están contenidos en otro reporte en formato CSV.
+        SicflexListadoDeFacturas
+        """
+        new_data = self.data.copy()
+        facturas = SicflexListadoDeFacturas(filename)
+
+        for detalle in new_data:
+            detalle["vendedor"] = ""
+            almacen, tipo, numero = detalle["numero"].split("-")
+            numero = int(numero)
+            detalle_numero = f"{almacen}-{tipo}-{numero}"
+
+            for factura in facturas:
+                try:
+                    number = f"0{factura['almacen']}-{factura['tipo']}-{int(factura['numero'])}"
+                except (ValueError):
+                    continue
+                if detalle_numero == number:
+                    detalle["vendedor"] = factura["usuario_creo"]
+
+        self.ENCABEZADOS = list(self.ENCABEZADOS) + ["Vendedor"]
+        self.ENCABEZADOS_KEYS = list(self.ENCABEZADOS_KEYS) + ["vendedor"]
+        self.data = new_data
+        return self.data
+
 
     @classmethod
     def IsFacturaDetalle(self, row):
@@ -178,43 +205,42 @@ class SicflexReporteVentasPorFechaDetallada(Reporte):
                     return True
         return False
     
-    def ExportToExcel(self, filename=None):
-        """
-        Exporta la data generada por este reporte, a formato Excel.
-        """
+    
 
-        if (not filename):
-            filename = f"{self.__class__.__name__}.xls"
 
-        workbook = xlwt.Workbook()
-        sheet = workbook.add_sheet("blog.unolet.com")
-        rowindex = 0
 
-        # Encabezados.
-        colindex = 0
-        for name in self.ENCABEZADOS:
-            sheet.write(rowindex, colindex, name)
-            colindex += 1
 
-        rowindex += 1
-        for detalle in self.data:
+class SicflexListadoDeFacturas(Reporte):
+    """
+    Archivo en formato CSV extraido del listado de facturas en Sicflex.
 
-            # Movimientos.
-            movimientos = detalle["movimientos"]
-            for movimiento in movimientos:
-                
-                colindex = 0
+    Este archivo contiene información de cada factura, número, vendedor, fecha...
+    """
+    ROW_ENCABEZADOS = 0
+    COL_ENCABEZADOS = {
+        0: "almacen",
+        1: "tipo",
+        2: "numero",
+        3: "ncf",
+        4: "nif",
+        5: "usuario_creo",
+    }
+    ROW_FACTURA_DETALLE = None
+    COL_FACTURA_DETALLE = {}
+    ENCABEZADOS = ("Almacén", "Tipo", "Número", "NCF", "NIF", "Vendedor")
+    ENCABEZADOS_KEYS = ("almacen", "tipo", "numero", "ncf", "nif", "usuario_creo")
 
-                # Datos de la factura.
-                for colname in self.COL_FACTURA_DETALLE.values():
-                    sheet.write(rowindex, colindex, detalle[colname])
-                    colindex += 1
+    def __init__(self, filename):
+        super().__init__(filename)
 
-                # Datos del movimientos.
-                for colname in self.COL_ENCABEZADOS.values():
-                    sheet.write(rowindex, colindex, movimiento[colname])
-                    colindex += 1
+    def clean(self):
+        out = []
+        for row in self.csv:
+            item = {}
+            for index, name in self.COL_ENCABEZADOS.items():
+                item[name] = row[index]
+            out.append(item)
+        self.data = out
+        return self.data
 
-                rowindex += 1
-            
-        return workbook.save(filename)            
+

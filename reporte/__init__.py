@@ -1,1 +1,2 @@
-from .base import Reporte, ReporteError, Excel
+from reporte.base import ReporteError, Reporte, Excel
+from reporte.reportes import *

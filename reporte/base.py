@@ -1,3 +1,4 @@
+import csv
 import xlrd
 import xlwt
 
@@ -14,15 +15,97 @@ class Reporte:
     """
     Instancía de cualquier reporte en formato Excel.
     """
-    workbook = None
-    data = []
+    ROW_ENCABEZADOS = 0
+    COL_ENCABEZADOS = dict()
+    ROW_FACTURA_DETALLE = None
+    COL_FACTURA_DETALLE = dict()
+    ENCABEZADOS = list()
+    ENCABEZADOS_KEYS = list()
+    CSV_DELIMITER = ";"
+
+    def __init__(self, filename):
+        self.workbook = None
+        self.csv = None
+        self.rawdata = [] #
+        self.data = []
+        self.Open(filename)
+        self.Read()
+        self.clean()
+
+    def __iter__(self):
+        for item in self.data:
+            yield item
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+    def __len__(self):
+        return len(self.data)
+
+    def clean(self):
+        """
+        Agregue este método a cada reporte para generar el valor de self.data.
+        """
 
     def Open(self, filename):
-        self.workbook = Excel.open(filename)
-        return self.workbook
+        ext = filename.split(".")[-1].lower()
 
-    def __read(self):
-        self.data = Excel.read(self.workbook)
+        if ext in ("xls",):
+            self.workbook = Excel.open(filename)
+            return self.workbook
+        elif ext in ("csv",):
+            f = open(filename, "r")
+            self.csv = csv.reader(f, delimiter=self.CSV_DELIMITER)
+            return self.csv
+        else:
+            raise ReporteError("Formato de archivo no soportado.")
+
+    def Read(self):
+        if (self.workbook != None):
+            self.rawdata = Excel.read(self.workbook)
+            self.rawdata = Excel.cleanrows(self.rawdata)
+        elif (self.csv != None):
+            self.rawdata = self.csv
+        else:
+            self.rawdata = []
+
+    def ExportToExcel(self, filename=None):
+        """
+        Exporta la data generada por este reporte, a formato Excel.
+        """
+
+        if (not filename):
+            filename = f"{self.__class__.__name__}.xls"
+
+        workbook = xlwt.Workbook()
+        sheet = workbook.add_sheet("blog.unolet.com")
+        rowindex = 0
+
+        colindex = 0
+        for name in self.ENCABEZADOS:
+            sheet.write(rowindex, colindex, name)
+            colindex += 1
+
+        rowindex += 1
+        for detalle in self.data:
+            movimientos = detalle["movimientos"]
+
+            for movimiento in movimientos:
+                colindex = 0
+
+                # Datos de la factura.
+                for key in self.ENCABEZADOS_KEYS:
+                    
+                    try:
+                        value = detalle[key]
+                    except (KeyError):
+                        value = movimiento[key]
+
+                    sheet.write(rowindex, colindex, value)
+                    colindex += 1
+                rowindex += 1
+        
+        workbook.save(filename)         
 
 
 
