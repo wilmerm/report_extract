@@ -157,6 +157,11 @@ class SicflexReporteVentasPorFechaDetallada(Reporte):
         new_data = self.data.copy()
         facturas = SicflexListadoDeFacturas(filename)
 
+        progress = 0
+        length = len(new_data)
+
+        print(f"Estableciendo los vendedores: {length} filas en total.")
+
         for detalle in new_data:
             detalle["vendedor"] = ""
             almacen, tipo, numero = detalle["numero"].split("-")
@@ -165,11 +170,19 @@ class SicflexReporteVentasPorFechaDetallada(Reporte):
 
             for factura in facturas:
                 try:
-                    number = f"0{factura['almacen']}-{factura['tipo']}-{int(factura['numero'])}"
+                    number = f"{factura['almacen'].zfill(2)}-{factura['tipo']}-{int(factura['numero'])}"
                 except (ValueError):
                     continue
+
                 if detalle_numero == number:
                     detalle["vendedor"] = factura["usuario_creo"]
+                    break
+            
+            if not detalle["vendedor"]:
+                print(f"Error. No se encontró el vendedor para '{detalle_numero}'.")
+
+            print(f"------ {progress} de {length} | {detalle['vendedor']}", end="\r")
+            progress += 1
 
         self.ENCABEZADOS = list(self.ENCABEZADOS) + ["Vendedor"]
         self.ENCABEZADOS_KEYS = list(self.ENCABEZADOS_KEYS) + ["vendedor"]
@@ -235,11 +248,27 @@ class SicflexListadoDeFacturas(Reporte):
 
     def clean(self):
         out = []
-        for row in self.csv:
+        rows = list(self.csv)
+        length = len(rows)
+        progress = 0
+        print(f"Cargando {self.__class__.__name__}. {length} filas a cargar.")
+
+        for row in rows:
+
+            if not row:
+                progress += 1
+                continue
+
+            print(f"Fila {progress} de {length}.", end="\r")
             item = {}
             for index, name in self.COL_ENCABEZADOS.items():
-                item[name] = row[index]
+                try:
+                    item[name] = row[index]
+                except (IndexError):
+                    print(f"IndexError: {progress=}, {index=}, {row=}")
             out.append(item)
+
+            progress += 1
         self.data = out
         return self.data
 
